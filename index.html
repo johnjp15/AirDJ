@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<!--
+
+See additional libraries, guides, and examples at:
+
+ - https://developer.leapmotion.com/downloads/javascript
+ - https://developer.leapmotion.com/getting-started/javascript
+ - https://developer.leapmotion.com/gallery/tags/javascript
+
+-->
+
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>Index Page</title>
+<script src="http://js.leapmotion.com/leap-0.6.4.min.js"></script>
+<script>
+// Store frame for motion functions
+var previousFrame = null;
+var paused = false;
+var pauseOnGesture = false;
+
+// Setup Leap loop with frame callback function
+var controllerOptions = {enableGestures: true};
+
+// to use HMD mode:
+// controllerOptions.optimizeHMD = true;
+
+Leap.loop(controllerOptions, function(frame) {
+	if (paused) {
+		return; // Skip this update
+	}
+
+
+
+	// Display Pointable (finger and tool) object data
+	var pointableOutput = document.getElementById("pointableData");
+	var pointableString = "";
+	if (frame.pointables.length > 0) {
+		var fingerTypeMap = ["Thumb", "Index finger", "Middle finger", "Ring finger", "Pinky finger"];
+		var boneTypeMap = ["Metacarpal", "Proximal phalanx", "Intermediate phalanx", "Distal phalanx"];
+		for (var i = 0; i < frame.pointables.length; i++) {
+			var pointable = frame.pointables[i];
+
+			pointableString += "<div style='width:250px; float:left; padding:5px'>";
+
+			if (pointable.tool) {
+				pointableString += "Pointable ID: " + pointable.id + "<br />";
+				pointableString += "Classified as a tool <br />";
+				pointableString += "Length: " + pointable.length.toFixed(1) + " mm<br />";
+				pointableString += "Width: "  + pointable.width.toFixed(1) + " mm<br />";
+				pointableString += "Direction: " + vectorToString(pointable.direction, 2) + "<br />";
+				pointableString += "Tip position: " + vectorToString(pointable.tipPosition) + " mm<br />"
+				pointableString += "</div>";
+			}
+			else {
+				pointableString += "Pointable ID: " + pointable.id + "<br />";
+				pointableString += "Type: " + fingerTypeMap[pointable.type] + "<br />";
+				pointableString += "Belongs to hand with ID: " + pointable.handId + "<br />";
+				pointableString += "Classified as a finger<br />";
+				pointableString += "Length: " + pointable.length.toFixed(1) + " mm<br />";
+				pointableString += "Width: "  + pointable.width.toFixed(1) + " mm<br />";
+				pointableString += "Direction: " + vectorToString(pointable.direction, 2) + "<br />";
+				pointableString += "Extended?: "  + pointable.extended + "<br />";
+				pointable.bones.forEach( function(bone){
+					pointableString += boneTypeMap[bone.type] + " bone <br />";
+					pointableString += "Center: " + vectorToString(bone.center()) + "<br />";
+					pointableString += "Direction: " + vectorToString(bone.direction()) + "<br />";
+					pointableString += "Up vector: " + vectorToString(bone.basis[1]) + "<br />";
+				});
+				pointableString += "Tip position: " + vectorToString(pointable.tipPosition) + " mm<br />";
+				pointableString += "</div>";
+			}
+		}
+	}
+	else {
+		pointableString += "<div>No pointables</div>";
+	}
+	pointableOutput.innerHTML = pointableString;
+
+	
+
+	// Store frame for motion functions
+	previousFrame = frame;
+})
+
+//returns cross product vector normal to vectors1 and vector2
+function getCrossProduct(v1, v2) {
+	i = (v1.j * v2.z - v2.j * v1.k);
+	j = (v2.i * v1.k - v1.i * v2.k);
+	k = (v1.i * v2.j - v2.i * v1.j);
+
+	n = {"i":i, "j":j, "k":k};
+
+	return n;
+}
+
+//subtracts the two points to get a vector pointing towards point2 from point1
+function getVectorFromPoints(point1, point2)  {
+	delta_x = point2[0] - point1[0];
+	delta_y = point2[1] - point1[1];
+	delta_z = point2[2] - point1[2];
+
+	vector = {"i":delta_x, "j":delta_y, "k":delta_z};
+
+	return vector;
+}
+
+//point1, point2, point3 are arrays, each one contains xyz coordinates (e.g. point1[])
+function getEquationOfPlaneFromPoints(point1, point2, point3) {
+	//taking point1 as center/origin (0, 0, 0)
+	vector v1 = getVectorFromPoints(point1, point2);
+	vector v2 = getVectorFromPoints(point1, point3);
+
+	vector n = getCrossProduct(v1, v2);
+
+	
+
+}
+
+function vectorToString(vector, digits) {
+	if (typeof digits === "undefined") {
+		digits = 1;
+	}
+	return "(" + vector[0].toFixed(digits) + ", "
+						 + vector[1].toFixed(digits) + ", "
+						 + vector[2].toFixed(digits) + ")";
+}
+
+function togglePause() {
+	paused = !paused;
+
+	if (paused) {
+		document.getElementById("pause").innerText = "Resume";
+	} else {
+		document.getElementById("pause").innerText = "Pause";
+	}
+}
+
+function pauseForGestures() {
+	if (document.getElementById("pauseOnGesture").checked) {
+		pauseOnGesture = true;
+	} else {
+		pauseOnGesture = false;
+	}
+}
+
+</script>
+
+</head>
+<body>
+<h1>Index Page</h1>
+<div id="main">
+	<button id="pause" onclick="togglePause()">Pause</button>
+	<input type="checkbox" id="pauseOnGesture" onclick="pauseForGestures()">Pause on gesture</input>
+	<h3>Frame data:</h3>
+	<div id="frameData"></div>
+	<div style="clear:both;"></div>
+	<h3>Hand data:</h3>
+	<div id="handData"></div>
+	<div style="clear:both;"></div>
+	<h3>Finger and tool data:</h3>
+	<div id="pointableData"></div>
+	<div style="clear:both;"></div>
+	<h3>Gesture data:</h3>
+	<div id="gestureData"></div>
+</div>
+</body>
+</html>

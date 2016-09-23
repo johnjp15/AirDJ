@@ -1,0 +1,917 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<style>
+body {
+margin:    0px;
+padding:    0px;
+}
+</style>
+
+	<script src="http://js.leapmotion.com/leap-0.6.4.min.js"></script>
+	<script src="js/test.js"></script>
+
+</head>
+<body bgcolor="black">
+              <canvas id="myCanvas" width="1280" height="720"></canvas>
+                                          <script>
+                                          var canvas = document.getElementById('myCanvas');
+var context = canvas.getContext('2d');
+context.font = "18px Arial";
+
+var mouseX = new Array();
+var mouseY = new Array();
+var mouseXP = new Array();
+var mouseYP = new Array();
+	var deck1splaying = false;
+	var deck1sbackplaying = false;
+	var deck2splaying = false;
+	var deck2sbackplaying = false;
+    var deck1pos = null;
+    var deck1last = null;
+    var deck2pos = null;
+    var deck2last = null;
+
+var windowWidth = 1280;
+var windowHeight = 720;
+
+var lmousedown = new Array();
+
+var colorScheme = "gray";
+var colorDeck1 = "blue";
+var colorDeck2 = "red";
+var deckVolume = [-1,-1];
+var deckMute = [false, false];
+
+var displayMode=2;//1 is the setup menu, 2 is the actual
+lmousedown[0]=0;
+
+//edit vars WHICH WE ARE DITCHING/BITCHING
+var editCurrentDeck=1;
+var editTempX=-1;
+var editTempY=-1;
+var editTempX2=-1;
+var editTempY2=-1;
+var editTempIndex=-1;
+
+//jog wheel
+var jWheelSpeed = [1,1];
+var jWheelRadius = 180;
+var jWheelAngle=[3*Math.PI/2,3*Math.PI/2];
+var jWheelLocation=[ {x:200,y:200}, {x:1080,y:200}];
+var jWheelTime = [0,0];
+var jWheelPaused = [true, true	];
+var jWheelMouseAngle = [0,0];
+var jWheelClicked = [-1, -1];
+
+//buttons
+var buttons = [
+                  {x:100, y:400, width:50, height:50, string:">", deck:1, type:0, func:1},
+                  //function 1 play/pause
+                  {x:1130, y:400, width:50, height:50, string:">", deck:2, type:0, func:1},
+                  {x:395, y:330, width:50, height:50, string:"mute", deck:1, type:0, func:2},
+                  //function 2 mute/unmute
+                  {x:835, y:330, width:50, height:50, string:"mute", deck:2, type:0, func:2},
+                  {x:465, y:330, width:50, height:50, string:"reset", deck:1, type:0, func:3},
+                  //function 3 reset speed
+                  {x:765, y:330, width:50, height:50, string:"reset", deck:2, type:0, func:3}];
+
+//sliders
+var sliders = [
+                  {x:400, y:480, width:480, height:0, string:"XFADE", deck:0, type:0, func:1, value:0, isClicked:-1},
+                  //function 1 crossfade type 0 is horizontal, 1 is vertical
+                  //volume
+                  {x:420, y:40, width:0, height:260, string:"VOL", deck:1, type:1, func:2, value:0, isClicked:-1},
+                  {x:860, y:40, width:0, height:260, string:"VOL", deck:2, type:1, func:2, value:0, isClicked:-1},
+                  //speed
+                  {x:490, y:40, width:0, height:260, string:"SPD", deck:1, type:1, func:3, value:.5, isClicked:-1},
+                  {x:790, y:40, width:0, height:260, string:"SPD", deck:2, type:1, func:3, value:.5, isClicked:-1}
+              ];
+
+var buttonArrayString = new Array();
+//alternate for deck 1 and deck 2, so we only have to populate half as many
+buttonArrayString[0] = "Play/Pause";
+buttonArrayString[1] = "Reset";
+buttonArrayString[2] = "Mute/Unmute";
+buttonArrayString[3] = "Slight Slow";
+buttonArrayString[4] = "Slight Speed";
+
+init();
+
+function init() {
+    setInterval(runLoop,25);
+    addEventListener("keydown", keyPress, false);
+    addEventListener("keyup", keyRelease, false);
+    addEventListener("mousemove", mouseMove, false);
+    addEventListener("mousedown", mouseDown, false);
+    addEventListener("mouseup", mouseUp, false);
+}
+
+function runLoop() {
+if (plane)
+{
+	mouseX[1]=constant[0]*windowWidth;
+	mouseY[1]=constant[1]*windowHeight;
+	if (isTouch)
+	{
+    if (lmousedown[1]==0)
+    {
+		lmousedown[1]=2;
+		}
+		}
+		else
+		lmousedown[1]=0;
+}
+    draw();
+    update();
+    for (a=0;a<mouseX.length;a++)
+    {
+		
+		context.beginPath();
+		context.rect(mouseX[a],mouseY[a],10,10);
+		context.fillStyle = 'white';
+		if (lmousedown[a]>0)
+			context.fillStyle = 'green';
+		
+		context.fill(); //background
+        mouseXP[a]=mouseX[a];
+        mouseYP[a]=mouseY[a];
+    }
+}
+
+function update()
+{
+	deck1pos=Math.max(deck1pos,0);
+	deck2pos=Math.max(deck2pos,0);
+    for (a=0; a<2; a++)
+    {
+        if (!jWheelPaused[a])
+        {
+		
+            jWheelTime[a]+=jWheelSpeed[a];
+            jWheelAngle[a]+=jWheelSpeed[a]*Math.PI/64;
+			if(a==0)
+			{
+				if (jWheelSpeed[a]>=0)
+				{
+					if (!deck1splaying)
+						deck1play();
+					if (deck1sbackplaying)
+						deck1pauseback();
+					deck1pos += deck1source.playbackRate.value * (aContext.currentTime - deck1last)
+					deck1last = aContext.currentTime
+				}
+				else
+				{
+					if (deck1splaying)
+					deck1pause();
+					if (!deck1sbackplaying)
+					deck1playback();
+					deck1pos += deck1backsource.playbackRate.value * (aContext.currentTime - deck1last)
+					deck1last = aContext.currentTime
+				}
+			}
+			else
+			{
+				if (jWheelSpeed[a]>=0)
+				{
+					if (!deck2splaying)
+					deck2play();
+					if (deck2sbackplaying)
+					deck2pauseback();
+					deck2pos += deck2source.playbackRate.value * (aContext.currentTime - deck2last)
+					deck2last = aContext.currentTime
+				}
+				else
+				{
+					if (deck2splaying)
+					deck2pause();
+					if (!deck2sbackplaying)
+					deck2playback();
+					deck2pos -= deck2backsource.playbackRate.value * (aContext.currentTime - deck2last)
+					deck2last = aContext.currentTime
+				}
+			}
+        }
+		else
+		{
+			if(a==0)
+			{
+					if (deck1splaying)
+						deck1pause();
+					if (deck1sbackplaying)
+						deck1pauseback();
+					}
+					else
+			{
+					if (deck2splaying)
+						deck2pause();
+					if (deck2sbackplaying)
+						deck2pauseback();
+					}
+			
+		}
+    }
+	
+}
+
+function getDeckColor(d)
+{
+    if (d==1)
+	{
+	if (typeof deck1buffer !== 'undefined')
+        return colorDeck1;
+        return 'black';
+		}
+    else if (d==2)
+	{
+	if (typeof deck2buffer !== 'undefined')
+        return colorDeck2;
+        return 'black';
+		}
+    else return 'gray';
+}
+
+function draw()
+{
+
+		soundVolumeUpdate();
+    context.beginPath();
+    context.rect(0,0,windowWidth,windowHeight);
+    context.fillStyle = 'black';
+    context.fill(); //background
+    context.lineWidth = 8;
+    context.strokeStyle = colorScheme;
+    context.stroke();
+    context.fillStyle = colorDeck1;
+    context.fillText("Deck 1", 5, 22);
+    context.fillStyle = colorDeck2;
+    context.fillText("Deck 2", 1218, 22);
+    context.font="12px Arial";
+
+    for (a=0; a<buttons.length; a++)
+    {
+        //draw buttons
+        if (buttons[a].type==0) //square button
+        {
+            var mOver=-1;
+            for (b=0; b<mouseX.length; b++)
+            {
+                if (mouseX[b]<buttons[a].x+buttons[a].width && mouseX[b]>buttons[a].x && mouseY[b]<buttons[a].y+buttons[a].height && mouseY[b]>buttons[a].y)
+                    mOver=b;
+            }
+            context.beginPath();
+            context.fillStyle=getDeckColor(buttons[a].deck);
+            if (mOver>-1)
+                context.fillStyle='gray';
+            if (mOver>-1 && lmousedown[mOver]==1)
+                context.fillStyle='white';
+            context.rect(buttons[a].x, buttons[a].y, buttons[a].width,buttons[a].height);
+            context.fill();
+            context.fillStyle=colorScheme;
+            context.fillText(buttons[a].string, buttons[a].x+5,buttons[a].y+15);
+            if (mOver>-1 && lmousedown[mOver]==2)
+            {
+                clickButton(buttons[a].func,buttons[a].deck);
+            }
+        }
+    }
+    for (a=0; a<sliders.length; a++)
+    {
+        //draw sliders
+        if (sliders[a].type==0)//horizontal sliders
+        {
+            var mOver=-1;
+            var pinWidth=20;
+            var pinHeight=30;
+            var pinLBound=sliders[a].x+sliders[a].width*sliders[a].value-pinWidth;
+            for (b=0; b<mouseX.length; b++)
+            {
+                if (mouseX[b]<pinLBound+2*pinWidth && mouseX[b]>pinLBound && mouseY[b]<sliders[a].y+pinHeight && mouseY[b]>sliders[a].y-pinHeight)
+                    mOver=b;
+            }
+            context.beginPath();
+            context.fillStyle='gray';
+            context.rect(sliders[a].x, sliders[a].y-5, sliders[a].width,10);
+            context.fill();
+            context.beginPath();
+            context.fillStyle=getDeckColor(sliders[a].deck);
+            if (mOver>-1)
+                context.fillStyle='gray';
+            if (mOver>-1 && lmousedown[mOver]==2)
+            {
+                sliders[a].isClicked=mOver;
+            }
+            if (sliders[a].isClicked>-1)
+                context.fillStyle='white';
+            context.rect(pinLBound, sliders[a].y-pinHeight, pinWidth*2,pinHeight*2);
+            context.fill();
+            context.fillStyle=colorScheme;
+            context.fillText(sliders[a].string, sliders[a].x+5,sliders[a].y+15);
+            if (sliders[a].isClicked>-1)
+            {
+                sliders[a].value+=(mouseX[sliders[a].isClicked]-mouseXP[sliders[a].isClicked])/(sliders[a].width);
+                sliders[a].value = Math.max(0,Math.min(sliders[a].value,1));
+            }
+        }
+        else if (sliders[a].type==1)//vertical sliders
+        {
+            var mOver=-1;
+            var pinWidth=30;
+            var pinHeight=20;
+            var pinTBound=sliders[a].y+sliders[a].height*sliders[a].value-pinHeight;
+            for (b=0; b<mouseX.length; b++)
+            {
+                if (mouseY[b]<pinTBound+2*pinWidth && mouseY[b]>pinTBound && mouseX[b]<sliders[a].x+pinWidth && mouseX[b]>sliders[a].x-pinWidth)
+                    mOver=b;
+            }
+            context.beginPath();
+            context.fillStyle='gray';
+            context.rect(sliders[a].x-5, sliders[a].y,10, sliders[a].height);
+            context.fill();
+            context.beginPath();
+            context.fillStyle=getDeckColor(sliders[a].deck);
+            if (mOver>-1)
+                context.fillStyle='gray';
+            if (mOver>-1 && lmousedown[mOver]==2)
+            {
+                sliders[a].isClicked=mOver;
+            }
+            if (sliders[a].isClicked>-1)
+                context.fillStyle='white';
+            context.rect(sliders[a].x-pinWidth, pinTBound, pinWidth*2,pinHeight*2);
+            context.fill();
+            context.fillStyle=colorScheme;
+            context.fillText(sliders[a].string, sliders[a].x+5,sliders[a].y+15);
+            if (sliders[a].isClicked>-1)
+            {
+                sliders[a].value+=(mouseY[sliders[a].isClicked]-mouseYP[sliders[a].isClicked])/(sliders[a].height);
+                sliders[a].value = Math.max(0,Math.min(sliders[a].value,1));
+            }
+        }
+        if (sliders[a].isClicked>-1)
+        {
+            clickSlider(sliders[a].func,sliders[a].deck,sliders[a].value);
+        }
+    }
+    context.font="18px Arial";
+    if (displayMode==1)//setup menu
+    {
+        drawSetupMode();
+    }
+    else if (displayMode==2)//regular menu
+    {
+        drawNormalMode();
+    }
+    for (a=0; a<lmousedown.length; a++)//RESET SHIT
+        if (lmousedown[a]==2)
+        {
+            lmousedown[a]=1;
+        }
+    for (a=0; a<sliders.length; a++)
+        if (sliders[a].isClicked>-1 && lmousedown[sliders[a].isClicked]==0)
+            sliders[a].isClicked=-1;
+    for (a=0; a<jWheelClicked.length; a++)
+        if (jWheelClicked[a]>-1 && lmousedown[jWheelClicked[a]]==0)
+            jWheelClicked[a]=-1;
+	
+}
+function clickButton(func, deck)
+{
+    if (func==1)//play pause
+    {
+        jWheelPaused[deck-1]=!jWheelPaused[deck-1];
+        /*if (!jWheelPaused[deck-1])
+        {
+            if (deck==1)
+                deck1play();
+            else
+                deck2play();
+        }
+		else
+		{
+		
+            if (deck==1)
+                deck1pause();
+            else
+                deck2pause();
+		}*/
+		//soundVolumeUpdate();
+		
+		soundVolume(deck,deckVolume[deck-1]);
+		soundVolumeUpdate();
+    }
+    else if (func==2)//play pause
+    {
+        deckMute[deck-1]=!deckMute[deck-1];
+    }
+    else if (func==3)//reset speed
+    {
+        sliders[3-1+deck].value=.5;
+        jWheelSpeed[deck-1]=1;
+        playSpeed(deck-1,jWheelSpeed[deck-1]);
+    }
+}
+function clickSlider(func, deck, value)
+{
+    if (func==1)//crossfade
+	{
+		soundVolumeUpdate();
+	}
+    else if (func==2)
+    {
+        deckVolume[deck-1]=value;
+		soundVolume(deck,value);
+		soundVolumeUpdate();
+    }
+    else if (func==3)
+    {
+        jWheelSpeed[deck-1]=2-2*value;
+        playSpeed(deck-1,jWheelSpeed[deck-1]);
+    }
+}
+function drawNormalMode()
+{
+    //for (a=0;a<lmousedown.length; a++)
+    //    console.log(lmousedown[a]);
+    //jog wheels
+    for (a=0; a<2; a++)
+    {
+        //draw wheels
+        context.fillStyle=getDeckColor(a+1);
+        context.beginPath();
+        context.arc(jWheelLocation[a].x, jWheelLocation[a].y, jWheelRadius, 0, 2 * Math.PI, false);
+        context.fill();
+        context.lineWidth = 2;
+        context.strokeStyle = colorScheme;
+        context.stroke();
+        context.beginPath();
+        context.moveTo(jWheelLocation[a].x, jWheelLocation[a].y);
+        context.lineTo(jWheelLocation[a].x+jWheelRadius*Math.cos(jWheelAngle[a]), jWheelLocation[a].y+jWheelRadius*Math.sin(jWheelAngle[a]));
+        context.lineWidth = 6;
+        context.strokeStyle = colorScheme;
+        context.stroke();
+
+        for (b=0; b<mouseX.length; b++)
+        {
+            if (lineDistance(mouseX[b],mouseY[b],jWheelLocation[a].x,jWheelLocation[a].y)<jWheelRadius)//if mouse is on the jog wheel
+            {
+                mOver=b;
+
+                if (lmousedown[b]==2)
+                {
+                    jWheelClicked[a]=mOver;
+                    jWheelMouseAngle[a]=lineAngle(mouseX[b],mouseY[b],jWheelLocation[a].x,jWheelLocation[a].y);
+                }
+            }
+        }
+		
+                if (jWheelClicked[a]!=-1 && lmousedown[jWheelClicked[a]]!=2)
+                {
+                    var tempAngle = lineAngle(mouseX[jWheelClicked[a]],mouseY[jWheelClicked[a]],jWheelLocation[a].x,jWheelLocation[a].y);
+                    jWheelSpeed[a]=(tempAngle-jWheelMouseAngle[a])/Math.PI*64;
+                    jWheelMouseAngle[a]=tempAngle;
+                    playSpeed(a,jWheelSpeed[a]);
+                }
+		
+        if (jWheelClicked[a]==-1)
+        {
+            jWheelSpeed[a]=jWheelSpeed[a]+((2-2*sliders[3+a].value)-jWheelSpeed[a])/2;
+            playSpeed(a,jWheelSpeed[a]);
+        }
+    }
+}
+function drawSetupMode()
+{
+    if (editTempX==-1)
+    {
+        for (a=0; a<lmousedown.length; a++)//add a button
+            if (lmousedown[a]==2)
+            {
+                editTempX=mouseX[a];
+                editTempY=mouseY[a];
+                editTempIndex=a;
+            }
+buttons[buttons.length]={x:
+                         editTempX, y:
+                         editTempY, x2:
+                                 editTempX,
+                         y2:
+                         editTempY, string:""
+                         , deck:
+                         editCurrentDeck, type:                         0,radius:                                 0                                }//button type 0 is button, 1 is slider, 2 is knob, 3 is vinyl
+
+                            }
+                            else if (editTempX2==-1)
+    {
+        if (lmousedown[editTempIndex]==0)
+        {
+            editTempX2=mouseX[editTempIndex];
+            editTempY2=mouseY[editTempIndex];
+        }
+        buttons[buttons.length-1].x2=mouseX[editTempIndex];
+        buttons[buttons.length-1].y2=mouseY[editTempIndex];//set the size of the buttons
+        buttons[buttons.length-1].radius=lineDistance(buttons[buttons.length-1].x,buttons[buttons.length-1].y,buttons[buttons.length-1].x2,buttons[buttons.length-1].y2);
+    }
+
+    if (editTempX2!=-1)
+    {
+        editButtonTypes();
+    }
+}
+function editButtonTypes()
+{
+    for (a=0; a<buttonArrayString.length; a++)//display the possible button types
+    {
+        var bwidth=120;
+        var bheight=60;
+        var lbound=bwidth*a
+                   var tbound=windowHeight-bheight;
+        var mOver=-1;
+        for (b=0; b<mouseX.length; b++)
+        {
+            if (mouseX[b]>lbound && mouseX[b]<lbound+bwidth && mouseY[b]>tbound && mouseY[b]<tbound+bheight)
+            {
+                if (mouseX[b]<lbound+bwidth/2)
+                    mOver=1;
+                else
+                    mOver=2;
+            }
+            if (lmousedown[b]==2 && mOver>-1)//if clicked in here
+            {
+                buttons[buttons.length-1].string=buttonArrayString[a];
+                buttons[buttons.length-1].type=0;
+                buttons[buttons.length-1].deck=mOver;
+
+                mOver;
+                editTempX=-1;
+                editTempY=-1;
+                editTempX2=-1;
+                editTempY2=-1;
+                editTempIndex=-1;
+            }
+        }
+
+        context.beginPath();
+        context.rect(lbound,tbound,bwidth/2,bheight);
+        context.fillStyle = getDeckColor(1);
+        if (mOver==1)
+            context.fillStyle = 'white';
+        context.fill();
+        context.beginPath();
+        context.rect(lbound+bwidth/2,tbound,bwidth/2,bheight);
+        context.fillStyle = getDeckColor(2);
+        if (mOver==2)
+            context.fillStyle = 'white';
+        context.fill();
+        context.beginPath();
+        context.rect(lbound,tbound,bwidth,bheight);
+        context.lineWidth = 3;
+        context.strokeStyle = colorScheme;
+        context.fillStyle = colorScheme;
+        context.stroke();
+        context.fillText(buttonArrayString[a], lbound+5, tbound+35);
+    }
+}
+function lineDistance( x1, y1, x2, y2 )
+{
+    var xs = 0;
+    var ys = 0;
+
+    xs = x1 - x2;
+    xs = xs * xs;
+
+    ys = y1 - y2;
+    ys = ys * ys;
+
+    return Math.sqrt( xs + ys );
+}
+function lineAngle( x1, y1, x2, y2 )
+{
+    if (x2<x1)
+        return Math.PI+Math.atan((y2-y1)/(x2-x1));
+    return Math.atan((y2-y1)/(x2-x1));
+}
+function mouseClick(x,y,index)
+{
+}
+function mouseMove(e) {
+    if (e.offsetX) {
+        mouseX[0] = e.offsetX;
+        mouseY[0] = e.offsetY;
+    } else
+        if (e.layerX) {
+            mouseX[0] = e.layerX;
+            mouseY[0] = e.layerY;
+        }
+    mouseX[0] = mouseX[0];// - (top_canvas.width/2);
+    mouseY[0] = mouseY[0];// - (top_canvas.height/2);
+    window.radians = Math.atan2(mouseY[0], mouseX[0]);
+}
+function mouseDown(e) {
+    if (lmousedown[0]==0)
+    {
+        lmousedown[0]=2;
+        mouseClick(mouseX[0], mouseY[0],0);
+    }
+}
+function mouseUp(e) {
+    lmousedown[0]=0;
+}
+function keyPress(event) {
+    
+		console.log("0 pressed");
+	// console.log("keypress")
+	if(event.keyCode == 49){
+		console.log("1 pressed");
+		regionTopLeft = position;
+	}
+	else if(event.keyCode == 50){
+		console.log("2 pressed");
+		regionTopRight = position;
+	}
+	else if(event.keyCode == 51){
+		console.log("3 pressed");
+		regionBottomRight = position;
+	}
+	else if(event.keyCode == 52){
+		console.log("4 pressed");
+		regionBottomLeft = position;
+	}
+
+	else if(event.keyCode == 68 || event.keyCode == 100)	{
+		plane = getEquationOfPlaneFromPoints(regionTopLeft, regionTopRight, regionBottomLeft);
+		console.log(plane);
+	}
+}
+function keyRelease(e) {
+    if (e.keyCode==221)//]
+    {
+    }
+}
+
+</script>
+
+<script type="text/javascript" src="jquery-1.11.3.min.js"></script>
+                                   <script type="text/javascript">
+                                                var aContext=null;
+$(document).ready(function() {
+    if (!window.AudioContext) {
+        alert('The Web Audio API is not supported in your browser!');
+    }
+    aContext = new window.AudioContext();
+
+    var deck1source = null;
+    var deck1buffer = null;
+    var deck1backsource = null;
+    var deck1backbuffer = null;
+
+    var deck2source = null;
+    var deck2buffer = null;
+    var deck2backsource = null;
+    var deck2backbuffer = null;
+    var deck1pos = null;
+    var deck1last = null;
+    var deck2pos = null;
+    var deck2last = null;
+	
+	var gainNode1;
+	var gainNode2;
+
+    loadSoundFile1('https://dl.dropboxusercontent.com/u/64168695/djPlaylist/every%20time%20we%20touch.mp3',0);
+    loadSoundFile2('https://dl.dropboxusercontent.com/u/64168695/djPlaylist/skrillex_bangarang.mp3',0);
+});
+
+function cloneAudioBuffer(audioBuffer) {
+    var channels = [],
+                   numChannels = audioBuffer.numberOfChannels;
+
+    //clone the underlying Float32Arrays
+    for (var i = 0; i < numChannels; i++) {
+        channels[i] = new Float32Array(audioBuffer.getChannelData(i));
+    }
+
+    //create the new AudioBuffer (assuming AudioContext variable is in scope)
+    var newBuffer = aContext.createBuffer(
+                        audioBuffer.numberOfChannels,
+                        audioBuffer.length,
+                        audioBuffer.sampleRate
+                    );
+
+    //copy the cloned arrays to the new AudioBuffer
+    for (var i = 0; i < numChannels; i++) {
+        newBuffer.getChannelData(i).set(channels[i]);
+    }
+
+    return newBuffer;
+}
+function playSpeed(index, p)
+{
+	try{
+    if (index==0)
+    {
+        deck1source.playbackRate.value = p;
+        deck1backsource.playbackRate.value = p;
+    }
+    else
+    {
+        deck2source.playbackRate.value = p;
+        deck2backsource.playbackRate.value = p;
+    }
+	}
+	catch (err)
+	{
+		//console.log(err);
+	}
+}
+function scratch(index) {
+    p = 1.5
+        source.playbackRate.value = p;
+    backsource.playbackRate.value = p;
+    t = .3
+        source.start(0,0,t)
+        backsource.start(aContext.currentTime + (t/p),backAudioBuffer.duration - t,t)
+
+    }
+
+function stopSound(index) {
+    if (source) {
+        source.stop(0);
+    }
+}
+
+function playSound(index) {
+    source = aContext.createBufferSource(); // Global so we can .noteOff() later.
+    source.buffer = audioBuffer;
+    source.loop = false;
+    source.connect(aContext.destination);
+
+    backsource = aContext.createBufferSource(); // Global so we can .noteOff() later.
+    backsource.buffer = backAudioBuffer;
+    backsource.loop = false;
+    backsource.connect(aContext.destination);
+
+    source.start(0)
+}
+function soundVolumeUpdate()
+{
+if (typeof gainNode1 !== 'undefined')
+		gainNode1.gain.value=(-(deckVolume[0])*2+2)*(1-sliders[0].value)-1;
+if (typeof gainNode2 !== 'undefined')
+		gainNode2.gain.value=(-(deckVolume[1])*2+2)*(sliders[0].value)-1;
+}
+function soundVolume(index, vol)
+{
+try{
+	if (index==1)
+	{
+		gainNode1.gain.value=(-(vol)*2+2)*(1-sliders[0].value)-1;
+	}
+	else
+	{
+		gainNode2.gain.value=(-(vol)*2+2)*(sliders[0].value)-1;
+	}
+	}catch(err){}
+}
+
+function deck1play() {
+deck1splaying=true;
+    deck1source = aContext.createBufferSource()
+                  deck1source.buffer = deck1buffer
+                                       deck1source.loop = false
+                                                          deck1source.connect(aContext.destination)
+                                                          deck1source.start(0, deck1pos)
+                                                          deck1last = aContext.currentTime
+														  
+														  gainNode1 = aContext.createGain();
+// Connect the source to the gain node.
+deck1source.connect(gainNode1);
+// Connect the gain node to the destination.
+gainNode1.connect(aContext.destination);
+                                                                  }
+function deck1pause() {
+deck1splaying=false;
+    deck1source.stop(0)
+}
+function deck1playback() {
+deck1sbackplaying=true;
+    console.log(deck1backbuffer.getChannelData(0))
+
+    deck1backsource = aContext.createBufferSource()
+                      deck1backsource.buffer = deck1backbuffer
+                                               deck1backsource.loop = false
+                                                                      deck1backsource.connect(aContext.destination)
+
+                                                                      console.log(deck1buffer.duration)
+                                                                      console.log(deck1backbuffer.duration)
+
+                                                                      deck1backsource.start(0, deck1backbuffer.duration - deck1pos)
+                                                                      deck1last = aContext.currentTime
+deck1backsource.connect(gainNode1);
+                                                                              }
+function deck1pauseback() {
+deck1sbackplaying=false;
+    deck1backsource.stop(0)
+    //deck1pos -= deck1backsource.playbackRate.value * (aContext.currentTime - deck1last)
+    //            deck1last = 0;
+}
+
+function deck2play() {
+deck2splaying=true;
+    deck2source = aContext.createBufferSource()
+                  deck2source.buffer = deck2buffer
+                                       deck2source.loop = false
+                                                          deck2source.connect(aContext.destination)
+                                                          deck2source.start(0, deck2pos)
+                                                          deck2last = aContext.currentTime
+														  // Create a gain node.
+gainNode2 = aContext.createGain();
+// Connect the source to the gain node.
+gainNode2.gain.value=-1;
+deck2source.connect(gainNode2);
+// Connect the gain node to the destination.
+gainNode2.connect(aContext.destination);
+                                                                  }
+function deck2pause() {
+deck2splaying=false;
+    deck2source.stop(0)
+}
+function deck2playback() {
+deck2sbackplaying=true;
+    console.log(deck2backbuffer.getChannelData(0))
+
+    deck2backsource = aContext.createBufferSource()
+                      deck2backsource.buffer = deck2backbuffer
+                                               deck2backsource.loop = false
+                                                                      deck2backsource.connect(aContext.destination)
+
+                                                                      console.log(deck2buffer.duration)
+                                                                      console.log(deck2backbuffer.duration)
+
+                                                                      deck2backsource.start(0, deck2backbuffer.duration - deck2pos)
+                                                                      deck2last = aContext.currentTime
+deck2backsource.connect(gainNode2);
+                                                                              }
+function deck2pauseback() {
+deck2sbackplaying=false;
+    deck2backsource.stop(0)
+    //deck2pos -= deck2backsource.playbackRate.value * (aContext.currentTime - deck2last)
+    //            deck2last = 0;
+}
+
+function initSound1(arrayBuffer,index) {
+    aContext.decodeAudioData(arrayBuffer, function(buffer) {
+
+        deck1buffer = buffer;
+        deck1backbuffer = cloneAudioBuffer(buffer);
+        deck1pos = 0;
+
+        Array.prototype.reverse.call( deck1backbuffer.getChannelData(0) );
+        Array.prototype.reverse.call( deck1backbuffer.getChannelData(1) );
+
+        console.log(deck1buffer)
+        console.log(deck1backbuffer)
+    }, function(e) {
+        console.log('Error decoding', e);
+    });
+}
+
+function loadSoundFile1(url,index) {
+
+    var request = new XMLHttpRequest();
+    request.open('GET', url, true);
+    request.responseType = 'arraybuffer';
+    request.onload = function(e) {
+        initSound1(e.target.response,index);
+    };
+    request.send();
+}
+function initSound2(arrayBuffer,index) {
+    aContext.decodeAudioData(arrayBuffer, function(buffer) {
+
+        deck2buffer = buffer;
+        deck2backbuffer = cloneAudioBuffer(buffer);
+        deck2pos = 0;
+
+        Array.prototype.reverse.call( deck2backbuffer.getChannelData(0) );
+        Array.prototype.reverse.call( deck2backbuffer.getChannelData(1) );
+    }, function(e) {
+        console.log('Error decoding', e);
+    });
+}
+
+function loadSoundFile2(url,index) {
+
+    var request = new XMLHttpRequest();
+    request.open('GET', url, true);
+    request.responseType = 'arraybuffer';
+    request.onload = function(e) {
+        initSound2(e.target.response,index);
+    };
+    request.send();
+}
+</script>
+</body>
+
+
+</html>
